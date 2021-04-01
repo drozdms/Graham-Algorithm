@@ -221,7 +221,7 @@ QPoint ConvexHullWidget::screen_to_global(QPoint const & screen_pos) const
 
 void ConvexHullWidget::generatePoints(int quantity)
 {
-
+        // TODO: Generate points due different distribution laws
 
 
         QRandomGenerator generatorStartPoint = QRandomGenerator::securelySeeded();
@@ -280,6 +280,10 @@ void ConvexHullWidget::buildConvex()
     // do preprocessor
     // find point with min x
     // sort points by tan(pl, p)
+
+
+
+    // TODO: Use Approximation Resistant Predicates
 
     removeDuplicates();
     debugNext = true;

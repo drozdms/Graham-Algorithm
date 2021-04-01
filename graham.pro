@@ -25,7 +25,7 @@ HEADERS += \
     convexhullwidget.h \
     mainwindow.h
 
-INCLUDEPATH += "C:\Program Files\boost\boost_1_71_0" \
+INCLUDEPATH += "C:\Program Files\boost\boost_1_75_0" \
 
 FORMS += \
     mainwindow.ui
@@ -34,3 +34,5 @@ FORMS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+unix|win32: LIBS += -lOpenGL32
