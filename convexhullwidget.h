@@ -13,7 +13,7 @@ public:
 signals:
 
 public slots:
-    void generatePoints(int quantity = 1000);
+    void generatePoints(int quantity = 100000);
     void buildConvex();
     void reset();
     void finish();
@@ -44,14 +44,14 @@ private:
 
     public:
 
-        PreprocessorArea(QVector<QPointF> pol);
+        PreprocessorArea(QVector<QPointF> pol) : QPolygonF(pol)  {}
         bool containsPoint(const QPointF &pt) const;
-
-    private:
-        static void qt_polygon_isect_line_exclusive(const QPointF &p1, const QPointF &p2, const QPointF &pos,
-                                          int *winding);
-
     };
+
+
+public:
+    static const int POINT_SIZE;
+    static const int LINE_WIDTH;
 
 
 
