@@ -3,6 +3,7 @@
 
 #include <QtOpenGL>
 #include <boost/optional.hpp>
+
 class ConvexHullWidget : public QGLWidget
 {
     Q_OBJECT

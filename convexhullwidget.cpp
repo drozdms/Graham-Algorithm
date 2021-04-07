@@ -1,4 +1,5 @@
 #include "convexhullwidget.h"
+#include "Predicates.h"
 #include <algorithm>
 #include <set>
 #pragma comment( lib, "OpenGL32.lib" )
@@ -70,7 +71,7 @@ void ConvexHullWidget::paintGL()
             if (isConvexHullComplete)
                 glColor3f(0.0,1.0,0.0);
             else glColor3f(1.0,0.0,0.0);
-            glLineWidth(1);
+            glLineWidth(2);
             glBegin(GL_LINES);
                 glVertex2d(conv.at(i)->x(), conv.at(i)->y());
                 glVertex2d(conv.at((i+1)%conv.size())->x(),conv.at((i+1)%conv.size())->y());
@@ -252,26 +253,26 @@ bool compY(QPoint a, QPoint b)
     return a.y() < b.y();
 }
 
-bool sortTan(QPoint* a, QPoint* b)    // sort by decreasing tan
+bool sortTan(QPoint* a, QPoint* b)    // sort by decreasing tan (increasing from top to bottom of the stack)
 {
-    if (a == ConvexHullWidget::xMinPoint)
+    QPoint* ref = ConvexHullWidget::xMinPoint;
+    if (a == ref)
         return true;
-    else if (b == ConvexHullWidget::xMinPoint)
+    else if (b == ref)
         return false;
-    else if (a->x() == ConvexHullWidget::xMinPoint->x())    {
-       if (b->x() == ConvexHullWidget::xMinPoint->x())
+    else if (a->x() == ref->x())    {
+       if (b->x() == ref->x())
              return a->y() > b->y();
-       else return a->y() > ConvexHullWidget::xMinPoint -> y();
+       else return a->y() > ref -> y();
     }
+    else if (b->x() == ref->x())
+        return b->y() < ref -> y();
     else {
-    qreal tan1 = (a->y() - ConvexHullWidget::xMinPoint->y())/(qreal)(a->x() - ConvexHullWidget::xMinPoint->x());
-    if (b->x() == ConvexHullWidget::xMinPoint->x())
-        return b->y() < ConvexHullWidget::xMinPoint -> y();
-    else {
-        qreal tan2 = (b->y() - ConvexHullWidget::xMinPoint->y())/(qreal)(b->x() - ConvexHullWidget::xMinPoint->x());
+        qreal tan1 = (a->y() - ref->y())/(qreal)(a->x() - ref->x());
+        qreal tan2 = (b->y() - ref->y())/(qreal)(b->x() - ref->x());
         return tan1 > tan2;
-       }
     }
+
 }
 
 
@@ -285,6 +286,7 @@ void ConvexHullWidget::buildConvex()
 
     // TODO: Use Approximation Resistant Predicates
 
+    exact::Init();
     removeDuplicates();
     debugNext = true;
     isConvexHullComplete = false;
@@ -310,7 +312,7 @@ void ConvexHullWidget::buildConvex()
     pol.push_back(*Yborders.first);
     pol.push_back(*Xborders.first);
     PreprocessorArea centerPoly(pol);
-    for (int i =0; i < pointsBuf.size(); ++i)
+    for (int i =0; i < pointsBuf.size(); ++i)               // preprocessing
         if (!centerPoly.containsPoint(pointsBuf[i]))
             pointSet.push(&pointsBuf[i]);
     std::sort(pointSet.begin(), pointSet.end(), sortTan);
@@ -329,6 +331,8 @@ void ConvexHullWidget::buildConvex()
         }
 
         if (is_right_turn(conv.top(), v, w))
+        //if (exact::orient2d((double*){conv.top()->x(), conv.top()->y()},
+          //                  , w) < 0)
             v = conv.pop();
         else    {
             conv.push(v);
@@ -389,19 +393,20 @@ void ConvexHullWidget::PreprocessorArea::qt_polygon_isect_line_exclusive(const Q
     if (qFuzzyCompare((qreal)y1, (qreal)y2)) {
         // ignore horizontal lines according to scan conversion rule
         return;
-    } else if (y2 < y1) {
+    } else if (y2 < y1) {           // counter-clockwise: y1 comes first
         int x_tmp = x2; x2 = x1; x1 = x_tmp;
         int y_tmp = y2; y2 = y1; y1 = y_tmp;
-        dir = -1;
+        dir = -1;                   // downwards direction
     }
-    if (y >= y1 && y <= y2) {
-        qreal x = x1 + ((x2 - x1) / (qreal)(y2 - y1)) * (y - y1);
-        // count up the winding number if we're
-        if (x < pos.x()) {
+    if (y >= y1 && y <= y2) {       // consider an edge only if it cuts a line through a point and perpendicular
+                                    // to the y axis
+        qreal result = (y - y1)*(x2 - x1) - (pos.x() - x1)*(y2 - y1);
+        // count up the winding number if we're on the right
+        if (result < 0) {                  // decrease WN if the point is on the left of a downwards line
+                                            // and increase WN if the point is on the right of an upwards one
             (*winding) += dir;
-        } else if (x == pos.x())    {
+        } else if (qFuzzyCompare(result, 0.0))    {
             *winding = INT_MAX;
-
         }
     }
 }
@@ -416,15 +421,14 @@ bool ConvexHullWidget::PreprocessorArea::containsPoint(const QPoint &pt) const  
         const QPoint &e = at(i);
         qt_polygon_isect_line_exclusive(last_pt, e, pt, &winding_number);
         last_pt = e;
-        if (winding_number == INT_MAX)
+        if (winding_number == INT_MAX)              // a point lies on some edge
             break;
     }
     if (winding_number == INT_MAX)
-        return 0;                           // we exclude vertices and edges
-    // implicitly close last subpath
-    if (last_pt != last_start)
+        return 0;                                   // lies on an edge -> outsside
+    if (last_pt != last_start)                      // implicitly close last subpath
         qt_polygon_isect_line_exclusive(last_pt, last_start, pt, &winding_number);
-    return (winding_number % 2) != 0;
+    return winding_number != 0;
 }
 
 ConvexHullWidget::PreprocessorArea::PreprocessorArea(QVector<QPoint> pol) : QPolygon(pol)  {}
@@ -441,7 +445,7 @@ void ConvexHullWidget::removeDuplicates()   {
     QSet<QPoint> s;
     for (QPoint l : pointsBuf)
         s.insert(l);
-    pointsBuf = QList<QPoint>();
+    pointsBuf.clear();
     for (QPoint p : s)
         pointsBuf.push_back(p);
 }
