@@ -2,18 +2,21 @@
 #include "Predicates.h"
 #include <algorithm>
 #include <set>
+#include <iostream>
 #pragma comment( lib, "OpenGL32.lib" )
 
-QPoint* ConvexHullWidget::xMinPoint = new QPoint(9999999, 0);
+QPointF* ConvexHullWidget::xMinPoint = new QPointF(9999999, 0);
+
+const double EPS = 1e-06;
 
 ConvexHullWidget::ConvexHullWidget(QWidget *parent) :
     QGLWidget(parent), scale(1.0)
 {
     isConvexHullComplete = false;
     setMouseTracking(true);
-    pointsBuf = QList<QPoint>();
-    pointSet = QStack<QPoint*>();
-    conv = QStack<QPoint*>();
+    pointsBuf = QList<QPointF>();
+    pointSet = QStack<REAL*>();
+    conv = QStack<REAL*>();
     QLinearGradient gradient(QPoint(50, -20), QPoint(80, 20));
     gradient.setColorAt(0.0, Qt::white);
     gradient.setColorAt(1.0, QColor(164, 238, 223));
@@ -73,11 +76,11 @@ void ConvexHullWidget::paintGL()
             else glColor3f(1.0,0.0,0.0);
             glLineWidth(2);
             glBegin(GL_LINES);
-                glVertex2d(conv.at(i)->x(), conv.at(i)->y());
-                glVertex2d(conv.at((i+1)%conv.size())->x(),conv.at((i+1)%conv.size())->y());
+                glVertex2d(conv.at(i)[0], conv.at(i)[1]);
+                glVertex2d(conv.at((i+1)%conv.size())[0],conv.at((i+1)%conv.size())[1]);
             glEnd();
             glBegin(GL_POINTS);
-                glVertex2d(conv.at(i)->x(), conv.at(i)->y());
+                glVertex2d(conv.at(i)[0], conv.at(i)[1]);
             glEnd();
         }
 
@@ -88,16 +91,16 @@ void ConvexHullWidget::paintGL()
             glLineStipple(1, 0xAAAA);
             glEnable(GL_LINE_STIPPLE);
             glBegin(GL_LINES);
-            glVertex2d(conv.top()->x(), conv.top()->y());
-            glVertex2d(v->x(), v->y());
-            glVertex2d(v->x(), v->y());
-            glVertex2d(w->x(), w->y());
+            glVertex2d(conv.top()[0], conv.top()[1]);
+            glVertex2d(v[0], v[1]);
+            glVertex2d(v[0], v[1]);
+            glVertex2d(w[0], w[1]);
             glEnd();
 
             glColor3f(1.0,1.0,0.0);
             glBegin(GL_POINTS);
-                glVertex2d(v->x(), v->y());
-                glVertex2d(w->x(), w->y());
+                glVertex2d(v[0], v[0]);
+                glVertex2d(w[0], w[1]);
             glEnd();
 
             glPopAttrib();
@@ -116,7 +119,7 @@ void ConvexHullWidget::mouseReleaseEvent(QMouseEvent *event)
         move_point = boost::none;
     if (event->button()==Qt::LeftButton)
     {
-        QPoint pos = event->pos();
+        QPointF pos = event->pos();
         pos = screen_to_global(pos);
         pointsBuf.push_back(pos);
         updateGL();
@@ -142,14 +145,14 @@ void ConvexHullWidget::mouseMoveEvent(QMouseEvent* event)
 
     if (move_point)
     {
-            const int w = size().width();
-            const int h = size().height();
+            const double w = size().width();
+            const double h = size().height();
 
-            QPoint pos(event->pos().x(), event->pos().y());
-            QPoint sz(w / 2, h / 2);
+            QPointF pos(event->pos().x(), event->pos().y());
+            QPointF sz(w / 2, h / 2);
 
 
-            QPoint diff = pos - sz;
+            QPointF diff = pos - sz;
             diff.setX(-diff.x());
 
             center_ = *move_point + scale * diff;
@@ -179,11 +182,11 @@ void ConvexHullWidget::wheelEvent ( QWheelEvent * e )
             scale *= 1.05;
     }
 
-    QPoint pos(e->pos().x(), e->pos().y());
-    QPoint sz(size().width() / (qreal)2, size().height() / (qreal)2);
+    QPointF pos(e->pos().x(), e->pos().y());
+    QPointF sz(size().width() / (qreal)2, size().height() / (qreal)2);
 
-    QPoint diff = pos - sz;
-    center_ += (old_zoom - scale) * QPoint(diff.x(), diff.y());
+    QPointF diff = pos - sz;
+    center_ += (old_zoom - scale) * QPointF(diff.x(), diff.y());
     mouseMoveEvent(new QMouseEvent(QEvent::MouseMove, screen_to_global(e->pos()),Qt::LeftButton, nullptr, nullptr));
     resizeGL(size().width(), size().height());
 
@@ -198,10 +201,10 @@ void ConvexHullWidget::resizeGL(int w, int h)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
-    QPoint size = (scale / 2) * QPoint(w, h);
+    QPointF size = (scale / 2) * QPointF(w, h);
 
-    QPoint left_bottom = center_ + (-size);
-    QPoint right_top   = center_ + size;
+    QPointF left_bottom = center_ + (-size);
+    QPointF right_top   = center_ + size;
 
     glOrtho(left_bottom.x(), right_top.x(), left_bottom.y(), right_top.y(), -1.0, 1.0);
     glViewport(0, 0, w, h);
@@ -210,12 +213,12 @@ void ConvexHullWidget::resizeGL(int w, int h)
 
 
 
-QPoint ConvexHullWidget::screen_to_global(QPoint const & screen_pos) const
+QPointF ConvexHullWidget::screen_to_global(QPointF const & screen_pos) const
 {                                                   // global means (0,0) is at the center
-    QPoint pos(screen_pos.x(), screen_pos.y());
-    QPoint sz(size().width() / (qreal)2, size().height() / (qreal)2);
+    QPointF pos(screen_pos.x(), screen_pos.y());
+    QPointF sz(size().width() / (qreal)2, size().height() / (qreal)2);
 
-    QPoint diff = pos - sz;
+    QPointF diff = pos - sz;
     diff.setY(-diff.y());
     return center_+scale * diff;
 }
@@ -230,7 +233,7 @@ void ConvexHullWidget::generatePoints(int quantity)
         {
             double start_x = generatorStartPoint.bounded(size().width()-100);
             double start_y = generatorStartPoint.bounded(size().height()-100);
-            QPoint poi(start_x, start_y);
+            QPointF poi(start_x, start_y);
             poi = screen_to_global(poi);
             pointsBuf.push_back(poi);
 
@@ -241,37 +244,41 @@ void ConvexHullWidget::generatePoints(int quantity)
 }
 
 
-bool compX(QPoint a, QPoint b)
+bool compX(QPointF a, QPointF b)
 {
     if (a.x() == b.x())
         return a.y() < b.y();
     else return a.x() < b.x();
 }
 
-bool compY(QPoint a, QPoint b)
+bool compY(QPointF a, QPointF b)
 {
     return a.y() < b.y();
 }
 
-bool sortTan(QPoint* a, QPoint* b)    // sort by decreasing tan (increasing from top to bottom of the stack)
+
+bool equal(REAL* a, REAL*b) {
+    return fabs(a[0] - b[0]) < EPS && fabs(a[1] - b[1]) < EPS;
+}
+
+
+bool sortTan(REAL* a, REAL* b)    // sort by decreasing tan (increasing from top to bottom of the stack)
 {
-    QPoint* ref = ConvexHullWidget::xMinPoint;
-    if (a == ref)
-        return true;
-    else if (b == ref)
-        return false;
-    else if (a->x() == ref->x())    {
-       if (b->x() == ref->x())
-             return a->y() > b->y();
-       else return a->y() > ref -> y();
+    REAL ref[2] = {ConvexHullWidget::xMinPoint->x(), ConvexHullWidget::xMinPoint->y()};
+    exact::position flag =  exact::orient2d(ref, a, b);
+    if (flag == exact::on) {
+        if (equal(ref, a))
+            return true;
+        else if (equal(ref, b))
+            return false;
+        else if (a[1] > ref[1])
+            return (a[1] - ref[1] < b[1] - ref[1]);
+        else if (a[1] < ref[1])
+            return (ref[1] - a[1] > ref[1] - b[1]);
     }
-    else if (b->x() == ref->x())
-        return b->y() < ref -> y();
-    else {
-        qreal tan1 = (a->y() - ref->y())/(qreal)(a->x() - ref->x());
-        qreal tan2 = (b->y() - ref->y())/(qreal)(b->x() - ref->x());
-        return tan1 > tan2;
-    }
+    else
+        return flag == exact::right;
+
 
 }
 
@@ -292,8 +299,10 @@ void ConvexHullWidget::buildConvex()
     isConvexHullComplete = false;
     if (pointsBuf.size() < 3)
     {
-        for (auto p : pointsBuf)
-            conv.push(&p);
+        for (auto p : pointsBuf)    {
+            REAL pt[2] = {p.x(), p.y()};
+            conv.push(pt);
+        }
         isConvexHullComplete = true;
         updateGL();
         return;
@@ -305,7 +314,7 @@ void ConvexHullWidget::buildConvex()
     auto Xborders = std::minmax_element(pointsBuf.begin(), pointsBuf.end(), compX);
     auto Yborders = std::minmax_element(pointsBuf.begin(), pointsBuf.end(), compY);
     xMinPoint = &*Xborders.first;
-    QVector<QPoint> pol;
+    QVector<QPointF> pol;
     pol.push_back(*Xborders.first);
     pol.push_back(*Yborders.second);
     pol.push_back(*Xborders.second);
@@ -313,12 +322,17 @@ void ConvexHullWidget::buildConvex()
     pol.push_back(*Xborders.first);
     PreprocessorArea centerPoly(pol);
     for (int i =0; i < pointsBuf.size(); ++i)               // preprocessing
-        if (!centerPoly.containsPoint(pointsBuf[i]))
-            pointSet.push(&pointsBuf[i]);
+        if (!centerPoly.containsPoint(pointsBuf[i]))    {
+            REAL* pt = new REAL[2];
+            pt[0] = pointsBuf[i].x();
+            pt[1] = pointsBuf[i].y();
+            pointSet.push(pt);
+        }
     std::sort(pointSet.begin(), pointSet.end(), sortTan);
     v = pointSet.pop();
     w = pointSet.pop();
-    conv.push_back(xMinPoint);
+    REAL xMinPointReal[2] = {xMinPoint->x(), xMinPoint->y()};
+    conv.push_back(xMinPointReal);
     QTimer *timer = new QTimer(this);
     while (true)
     {
@@ -330,9 +344,9 @@ void ConvexHullWidget::buildConvex()
             updateGL();
         }
 
-        if (is_right_turn(conv.top(), v, w))
-        //if (exact::orient2d((double*){conv.top()->x(), conv.top()->y()},
-          //                  , w) < 0)
+//        std::cout << v[0] << "  " << v[1] << std::endl;
+        //if (is_right_turn(conv.top(), v, w))
+        if (exact::orient2d(conv.top(), v, w) == exact::right)
             v = conv.pop();
         else    {
             conv.push(v);
@@ -341,15 +355,13 @@ void ConvexHullWidget::buildConvex()
                 break;
             w = pointSet.pop();
         }
-
-
-
     }
 
      isConvexHullComplete = true;
-     v = nullptr;
-     w = nullptr;
+//     v = nullptr;
+//     w = nullptr;
     updateGL();
+
 
 }
 
@@ -359,13 +371,13 @@ void ConvexHullWidget::buildConvex()
 
 
 
-inline qreal ConvexHullWidget::determinant(QPoint* p1, QPoint* p2, QPoint* p3) {
+inline qreal ConvexHullWidget::determinant(QPointF* p1, QPointF* p2, QPointF* p3) {
    return (p2->x() * p3->y() - p3->x() * p2->y()) - (p1->x() * p3->y() - p3->x() * p1->y()) +
       (p1->x() * p2->y() - p2->x() * p1->y());
 }
 
-bool ConvexHullWidget::is_right_turn(QPoint* p1, QPoint* p2,
-      QPoint* p3) {
+bool ConvexHullWidget::is_right_turn(QPointF* p1, QPointF* p2,
+      QPointF* p3) {
    return determinant(p1, p2, p3) <= 0;
 }
 
@@ -381,21 +393,21 @@ void ConvexHullWidget::reset()
 
 
 
-void ConvexHullWidget::PreprocessorArea::qt_polygon_isect_line_exclusive(const QPoint &p1, const QPoint &p2, const QPoint &pos,
+void ConvexHullWidget::PreprocessorArea::qt_polygon_isect_line_exclusive(const QPointF &p1, const QPointF &p2, const QPointF &pos,
                                   int *winding)
 {
-    int x1 = p1.x();
-    int y1 = p1.y();
-    int x2 = p2.x();
-    int y2 = p2.y();
-    int y = pos.y();
+    qreal x1 = p1.x();
+    qreal y1 = p1.y();
+    qreal x2 = p2.x();
+    qreal y2 = p2.y();
+    qreal y = pos.y();
     int dir = 1;
-    if (qFuzzyCompare((qreal)y1, (qreal)y2)) {
+    if (qFuzzyCompare(y1, y2)) {
         // ignore horizontal lines according to scan conversion rule
         return;
     } else if (y2 < y1) {           // counter-clockwise: y1 comes first
-        int x_tmp = x2; x2 = x1; x1 = x_tmp;
-        int y_tmp = y2; y2 = y1; y1 = y_tmp;
+        qreal x_tmp = x2; x2 = x1; x1 = x_tmp;
+        qreal y_tmp = y2; y2 = y1; y1 = y_tmp;
         dir = -1;                   // downwards direction
     }
     if (y >= y1 && y <= y2) {       // consider an edge only if it cuts a line through a point and perpendicular
@@ -411,14 +423,14 @@ void ConvexHullWidget::PreprocessorArea::qt_polygon_isect_line_exclusive(const Q
     }
 }
 
-bool ConvexHullWidget::PreprocessorArea::containsPoint(const QPoint &pt) const     {
+bool ConvexHullWidget::PreprocessorArea::containsPoint(const QPointF &pt) const     {
     if (isEmpty())
         return false;
     int winding_number = 0;
-    QPoint last_pt = at(0);
-    QPoint last_start = at(0);
+    QPointF last_pt = at(0);
+    QPointF last_start = at(0);
     for (int i = 1; i < size(); ++i) {
-        const QPoint &e = at(i);
+        const QPointF &e = at(i);
         qt_polygon_isect_line_exclusive(last_pt, e, pt, &winding_number);
         last_pt = e;
         if (winding_number == INT_MAX)              // a point lies on some edge
@@ -431,22 +443,22 @@ bool ConvexHullWidget::PreprocessorArea::containsPoint(const QPoint &pt) const  
     return winding_number != 0;
 }
 
-ConvexHullWidget::PreprocessorArea::PreprocessorArea(QVector<QPoint> pol) : QPolygon(pol)  {}
+ConvexHullWidget::PreprocessorArea::PreprocessorArea(QVector<QPointF> pol) : QPolygonF(pol)  {}
 
 
-uint qHash(const QPoint &p)
+uint qHash(const QPointF &p)
 {
-   return qHash(QPair<int, int> (p.x(), p.y()) );
+   return qHash(QPair<double, double> (p.x(), p.y()) );
 }
 
 
 void ConvexHullWidget::removeDuplicates()   {
 
-    QSet<QPoint> s;
-    for (QPoint l : pointsBuf)
+    QSet<QPointF> s;
+    for (QPointF l : pointsBuf)
         s.insert(l);
     pointsBuf.clear();
-    for (QPoint p : s)
+    for (QPointF p : s)
         pointsBuf.push_back(p);
 }
 

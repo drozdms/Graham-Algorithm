@@ -3,13 +3,13 @@
 
 #include <QtOpenGL>
 #include <boost/optional.hpp>
-
+#include "Predicates.h"
 class ConvexHullWidget : public QGLWidget
 {
     Q_OBJECT
 public:
     explicit ConvexHullWidget(QWidget *parent = nullptr);
-    static QPoint* xMinPoint;
+    static QPointF* xMinPoint;
 signals:
 
 public slots:
@@ -26,29 +26,29 @@ private:
     QPen circlePen;
     bool debugNext;
     int debugSpeed;
-    QPoint* v;
-    QPoint* w;
+    REAL* v;
+    REAL* w;
     QPen textPen;
     QColor current_color_;
-    QList<QPoint> pointsBuf;
-    QStack<QPoint*> pointSet;
-    QStack<QPoint*> conv;
+    QList<QPointF> pointsBuf;
+    QStack<REAL*> pointSet;
+    QStack<REAL*> conv;
     bool isConvexHullComplete;
-    QPoint center_;
-    QPoint cur_pos;
+    QPointF center_;
+    QPointF cur_pos;
     // QUERY
 
-    boost::optional<QPoint> move_point;
+    boost::optional<QPointF> move_point;
 
-    class PreprocessorArea : public QPolygon   {
+    class PreprocessorArea : public QPolygonF   {
 
     public:
 
-        PreprocessorArea(QVector<QPoint> pol);
-        bool containsPoint(const QPoint &pt) const;
+        PreprocessorArea(QVector<QPointF> pol);
+        bool containsPoint(const QPointF &pt) const;
 
     private:
-        static void qt_polygon_isect_line_exclusive(const QPoint &p1, const QPoint &p2, const QPoint &pos,
+        static void qt_polygon_isect_line_exclusive(const QPointF &p1, const QPointF &p2, const QPointF &pos,
                                           int *winding);
 
     };
@@ -65,12 +65,12 @@ protected:
     void initializeGL() override;
     void paintGL() override;
     void removeDuplicates();
-    inline bool is_right_turn(QPoint* p1, QPoint* p2,
-          QPoint* p3);
+    inline bool is_right_turn(QPointF* p1, QPointF* p2,
+          QPointF* p3);
 
 
-    QPoint screen_to_global(QPoint const & screen_pos) const;
-    inline qreal determinant(QPoint* p1, QPoint* p2, QPoint* p3);
+    QPointF screen_to_global(QPointF const & screen_pos) const;
+    inline qreal determinant(QPointF* p1, QPointF* p2, QPointF* p3);
 };
 
 #endif // CONVEXHULLWIDGET_H
