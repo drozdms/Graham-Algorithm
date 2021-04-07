@@ -26,7 +26,7 @@ HEADERS += \
     mainwindow.h
 
 INCLUDEPATH += "C:\Program Files\boost\boost_1_75_0" \
-               "D:\University\Computer Graphics\Predicates"
+               "Shewchuk-Predicates" \
 
 FORMS += \
     mainwindow.ui
@@ -37,8 +37,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 
-win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../Predicates/release/ -lpredicates
-else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../Predicates/debug/ -lpredicates
+win32:CONFIG(release, debug|release): LIBS += -L$$PWD/Shewchuk-Predicates/release/ -lpredicates
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/Shewchuk-Predicates/debug/ -lpredicates
 
 
 

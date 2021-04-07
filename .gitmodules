@@ -1,0 +1,3 @@
+[submodule "Shewchuk-Predicates"]
+	path = Shewchuk-Predicates
+	url = git@github.com:drozdms/Shewchuk-Predicates.git
