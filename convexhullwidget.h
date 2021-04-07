@@ -32,7 +32,7 @@ private:
     QColor current_color_;
     QList<QPointF> pointsBuf;
     QStack<REAL*> pointSet;
-    QStack<REAL*> conv;
+    QStack<REAL*>* conv;
     bool isConvexHullComplete;
     QPointF center_;
     QPointF cur_pos;

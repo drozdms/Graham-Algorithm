@@ -16,7 +16,7 @@ ConvexHullWidget::ConvexHullWidget(QWidget *parent) :
     setMouseTracking(true);
     pointsBuf = QList<QPointF>();
     pointSet = QStack<REAL*>();
-    conv = QStack<REAL*>();
+    conv = new QStack<REAL*>();
     QLinearGradient gradient(QPoint(50, -20), QPoint(80, 20));
     gradient.setColorAt(0.0, Qt::white);
     gradient.setColorAt(1.0, QColor(164, 238, 223));
@@ -61,37 +61,40 @@ void ConvexHullWidget::paintGL()
         }
     }
 
-    if (conv.size())
+    if (conv->size())
     {
 
-        int size = conv.size();
+        int size = conv->size();
         if (!isConvexHullComplete)
             size --;
+        glPointSize(4);
+        glLineWidth(2);
         for (int i = 0; i < size; ++i)
         {
 
-            glPointSize(3);
+
             if (isConvexHullComplete)
                 glColor3f(0.0,1.0,0.0);
             else glColor3f(1.0,0.0,0.0);
-            glLineWidth(2);
+
             glBegin(GL_LINES);
-                glVertex2d(conv.at(i)[0], conv.at(i)[1]);
-                glVertex2d(conv.at((i+1)%conv.size())[0],conv.at((i+1)%conv.size())[1]);
+                glVertex2d(conv->at(i)[0], conv->at(i)[1]);
+                glVertex2d(conv->at((i+1)%conv->size())[0],conv->at((i+1)%conv->size())[1]);
             glEnd();
             glBegin(GL_POINTS);
-                glVertex2d(conv.at(i)[0], conv.at(i)[1]);
+                glVertex2d(conv->at(i)[0], conv->at(i)[1]);
             glEnd();
         }
+        glPointSize(3);
 
-        if (v!= nullptr && w != nullptr)
+        if (v!= nullptr && w != nullptr && !isConvexHullComplete)
         {
             glPushAttrib(GL_ENABLE_BIT);
-            glPointSize(3);
+
             glLineStipple(1, 0xAAAA);
             glEnable(GL_LINE_STIPPLE);
             glBegin(GL_LINES);
-            glVertex2d(conv.top()[0], conv.top()[1]);
+            glVertex2d(conv->top()[0], conv->top()[1]);
             glVertex2d(v[0], v[1]);
             glVertex2d(v[0], v[1]);
             glVertex2d(w[0], w[1]);
@@ -301,7 +304,7 @@ void ConvexHullWidget::buildConvex()
     {
         for (auto p : pointsBuf)    {
             REAL pt[2] = {p.x(), p.y()};
-            conv.push(pt);
+            conv->push(pt);
         }
         isConvexHullComplete = true;
         updateGL();
@@ -310,7 +313,7 @@ void ConvexHullWidget::buildConvex()
 
 
     pointSet.clear();
-    conv.clear();
+    conv->clear();
     auto Xborders = std::minmax_element(pointsBuf.begin(), pointsBuf.end(), compX);
     auto Yborders = std::minmax_element(pointsBuf.begin(), pointsBuf.end(), compY);
     xMinPoint = &*Xborders.first;
@@ -322,17 +325,12 @@ void ConvexHullWidget::buildConvex()
     pol.push_back(*Xborders.first);
     PreprocessorArea centerPoly(pol);
     for (int i =0; i < pointsBuf.size(); ++i)               // preprocessing
-        if (!centerPoly.containsPoint(pointsBuf[i]))    {
-            REAL* pt = new REAL[2];
-            pt[0] = pointsBuf[i].x();
-            pt[1] = pointsBuf[i].y();
-            pointSet.push(pt);
-        }
+        if (!centerPoly.containsPoint(pointsBuf[i]))
+            pointSet.push(new REAL[2]{pointsBuf[i].x(), pointsBuf[i].y()});
     std::sort(pointSet.begin(), pointSet.end(), sortTan);
     v = pointSet.pop();
     w = pointSet.pop();
-    REAL xMinPointReal[2] = {xMinPoint->x(), xMinPoint->y()};
-    conv.push_back(xMinPointReal);
+    conv->push_back(new qreal[2]{xMinPoint->x(),xMinPoint->y()});
     QTimer *timer = new QTimer(this);
     while (true)
     {
@@ -345,11 +343,11 @@ void ConvexHullWidget::buildConvex()
         }
 
 //        std::cout << v[0] << "  " << v[1] << std::endl;
-        //if (is_right_turn(conv.top(), v, w))
-        if (exact::orient2d(conv.top(), v, w) == exact::right)
-            v = conv.pop();
+        //if (is_right_turn(conv->top(), v, w))
+        if (exact::orient2d(conv->top(), v, w) == exact::right)
+            v = conv->pop();
         else    {
-            conv.push(v);
+            conv->push(v);
             v = w;
             if (pointSet.size() == 0)
                 break;
@@ -358,8 +356,8 @@ void ConvexHullWidget::buildConvex()
     }
 
      isConvexHullComplete = true;
-//     v = nullptr;
-//     w = nullptr;
+    v = nullptr;
+    w = nullptr;
     updateGL();
 
 
@@ -387,7 +385,7 @@ void ConvexHullWidget::reset()
         return;
     pointSet.clear();
     pointsBuf.clear();
-    conv.clear();
+    conv->clear();
     isConvexHullComplete = false;
 }
 
