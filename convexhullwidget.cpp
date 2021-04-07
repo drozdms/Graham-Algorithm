@@ -239,8 +239,8 @@ void ConvexHullWidget::generatePoints(int quantity)
         QRandomGenerator generatorStartPoint = QRandomGenerator::securelySeeded();
         for (int i=0; i<quantity; ++i)
         {
-            double start_x = generatorStartPoint.bounded(size().width()-100);
-            double start_y = generatorStartPoint.bounded(size().height()-100);
+            double start_x = generatorStartPoint.bounded((qreal)size().width()-100.);
+            double start_y = generatorStartPoint.bounded((qreal)size().height()-100.);
             QPointF poi(start_x, start_y);
             poi = screen_to_global(poi);
             pointsBuf.push_back(poi);
